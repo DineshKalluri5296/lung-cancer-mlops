@@ -1,6 +1,7 @@
+import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
-import os
+
 
 INPUT_FILE = "data/survey_lung_cancer.csv"
 TRAIN_FILE = "artifacts/train.csv"
@@ -9,103 +10,128 @@ TEST_FILE = "artifacts/test.csv"
 TARGET = "LUNG_CANCER"
 
 
-# Create artifacts folder
-os.makedirs("artifacts", exist_ok=True)
+def preprocess_data():
 
+    # Create artifacts directory
+    os.makedirs("artifacts", exist_ok=True)
 
-# Read dataset
-df = pd.read_csv(INPUT_FILE)
+    # Read dataset
+    print(f"Reading dataset: {INPUT_FILE}")
 
-print("Original shape:", df.shape)
-print("Columns:", df.columns.tolist())
+    df = pd.read_csv(INPUT_FILE)
 
+    print("Original shape:", df.shape)
+    print("Original columns:", df.columns.tolist())
 
-# Remove spaces from column names
-df.columns = df.columns.str.strip()
+    # Clean column names
+    df.columns = df.columns.str.strip()
 
+    # Remove unnecessary ID column
+    if "id" in df.columns:
+        df = df.drop(columns=["id"])
 
-# Remove unnecessary column if present
-if "id" in df.columns:
-    df = df.drop(columns=["id"])
+    # Convert categorical columns
+    for column in df.columns:
 
+        if df[column].dtype == "object":
 
-# Convert text values to numbers
-for column in df.columns:
+            df[column] = (
+                df[column]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+            )
 
-    if df[column].dtype == "object":
+            df[column] = df[column].replace({
+                "YES": 1,
+                "NO": 0,
+                "M": 1,
+                "F": 0
+            })
 
-        df[column] = (
-            df[column]
+    # Make sure target exists
+    if TARGET not in df.columns:
+        raise ValueError(
+            f"Target column '{TARGET}' not found."
+        )
+
+    # Convert target
+    if df[TARGET].dtype == "object":
+
+        df[TARGET] = (
+            df[TARGET]
             .astype(str)
             .str.strip()
             .str.upper()
+            .map({
+                "YES": 1,
+                "NO": 0
+            })
         )
 
-        df[column] = df[column].map({
-            "YES": 1,
-            "NO": 0,
-            "M": 1,
-            "F": 0
-        })
+    # Convert all remaining columns to numeric
+    for column in df.columns:
+        df[column] = pd.to_numeric(
+            df[column],
+            errors="coerce"
+        )
 
+    # Remove missing values
+    before = len(df)
 
-# Remove rows with missing values
-df = df.dropna()
+    df = df.dropna()
 
+    after = len(df)
 
-# Make sure target exists
-if TARGET not in df.columns:
-    raise ValueError(
-        f"Target column '{TARGET}' not found."
+    print(f"Removed {before - after} rows with missing values.")
+
+    # Separate features and target
+    X = df.drop(columns=[TARGET])
+    y = df[TARGET]
+
+    print("Features:", X.shape)
+    print("Target:", y.shape)
+
+    print("\nTarget distribution:")
+    print(y.value_counts())
+
+    # Train/test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42,
+        stratify=y
     )
 
+    # Create train dataset
+    train = X_train.copy()
+    train[TARGET] = y_train
 
-# Separate features and target
-X = df.drop(columns=[TARGET])
-y = df[TARGET]
+    # Create test dataset
+    test = X_test.copy()
+    test[TARGET] = y_test
 
-
-# Convert target if necessary
-if y.dtype == "object":
-    y = (
-        y.astype(str)
-        .str.strip()
-        .str.upper()
-        .map({
-            "YES": 1,
-            "NO": 0
-        })
+    # Save datasets
+    train.to_csv(
+        TRAIN_FILE,
+        index=False
     )
 
+    test.to_csv(
+        TEST_FILE,
+        index=False
+    )
 
-# Train/test split
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=42,
-    stratify=y
-)
+    print("\nPreprocessing completed.")
 
+    print("Train shape:", train.shape)
+    print("Test shape :", test.shape)
 
-# Create final datasets
-train = X_train.copy()
-train[TARGET] = y_train
-
-test = X_test.copy()
-test[TARGET] = y_test
+    print("\nSaved:")
+    print(TRAIN_FILE)
+    print(TEST_FILE)
 
 
-# Save
-train.to_csv(TRAIN_FILE, index=False)
-test.to_csv(TEST_FILE, index=False)
-
-
-print("\nPreprocessing completed.")
-
-print("Train shape:", train.shape)
-print("Test shape :", test.shape)
-
-print("\nSaved:")
-print(TRAIN_FILE)
-print(TEST_FILE)
+if __name__ == "__main__":
+    preprocess_data()
