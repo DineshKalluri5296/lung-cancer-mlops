@@ -51,10 +51,10 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::821656895219:role/GitHubActionsLungCancerRole
+          aws-region: ap-south-1
 
-
+  
       # --------------------------------------------------
       # 5. Test AWS connection
       # --------------------------------------------------
