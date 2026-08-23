@@ -1,11 +1,6 @@
 pandas
-numpy
 scikit-learn
 joblib
-mlflow
-boto3
-sagemaker
 pytest
-fastapi
-uvicorn
-prometheus-client
+mlflow==3.1.4
+boto3
