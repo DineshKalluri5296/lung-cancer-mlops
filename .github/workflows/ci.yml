@@ -1,53 +1,46 @@
-name: CI
+name: Lung Cancer MLOps CI
 
 on:
-
   push:
     branches:
       - main
-      - develop
 
   pull_request:
     branches:
       - main
 
-
 jobs:
 
-  test:
+  ml-pipeline:
 
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
 
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-
-        with:
-          python-version: "3.11"
-
+      - name: Setup MLflow URI
+        run: |
+          echo "MLFLOW_TRACKING_URI=http://32.198.38.148:5000/" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: |
-
-          python -m pip install --upgrade pip
-
+          python3 -m pip install --upgrade pip
           pip install -r requirements.txt
-
 
       - name: Run tests
         run: |
-
           pytest -v
 
-
-      - name: Build Docker image
+      - name: Preprocess data
         run: |
+          python src/preprocess.py
 
-          docker build \
-            -t lung-cancer-mlops:test \
-            .
+      - name: Train model
+        run: |
+          python src/train.py
+
+      - name: Evaluate model
+        run: |
+          python src/evaluate.py
