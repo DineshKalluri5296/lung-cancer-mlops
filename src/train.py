@@ -23,7 +23,7 @@ MLFLOW_TRACKING_URI = os.getenv(
     "http://32.198.38.148:5000"
 )
 
-EXPERIMENT_NAME = "LungCancerPrediction"
+EXPERIMENT_NAME = "LungCancerPrediction23"
 
 ALGORITHM = os.getenv("ALGORITHM", "logistic_regression")
 
