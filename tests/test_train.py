@@ -1,39 +1,24 @@
 import os
-import subprocess
-import sys
+import joblib
 
 
-def test_train():
+def test_train_model_exists():
 
-    # Make sure preprocessing has been completed
-    if not os.path.exists(
-        "artifacts/train.csv"
-    ):
+    # CI already runs:
+    # python src/train.py
+    #
+    # Therefore this test must NOT run train.py again.
+    # Otherwise MLflow creates a second run.
 
-        subprocess.run(
-            [
-                sys.executable,
-                "src/preprocess.py"
-            ],
-            check=True
-        )
+    model_path = "model/model.pkl"
 
-    # Run training
-    result = subprocess.run(
-        [
-            sys.executable,
-            "src/train.py"
-        ],
-        capture_output=True,
-        text=True
-    )
-
-    print(result.stdout)
-    print(result.stderr)
-
-    assert result.returncode == 0
-
-    # Check model
     assert os.path.exists(
-        "model/model.pkl"
-    )
+        model_path
+    ), f"Model not found: {model_path}"
+
+    # Verify the model can actually be loaded
+    model = joblib.load(model_path)
+
+    assert model is not None
+
+    print(f"Model verified successfully: {model_path}")
