@@ -74,6 +74,7 @@ def create_model():
         )
 
     else:
+
         raise ValueError(
             f"Unsupported algorithm: {ALGORITHM}"
         )
@@ -114,12 +115,14 @@ def main():
     )
 
     # IMPORTANT:
-    # Make sure autologging is disabled
+    # Disable autologging so ONLY our explicit run is created.
     mlflow.autolog(disable=True)
 
     # --------------------------------------------------------
     # Load data
     # --------------------------------------------------------
+
+    print(f"Reading dataset: {DATA_PATH}")
 
     df = pd.read_csv(DATA_PATH)
 
@@ -132,10 +135,14 @@ def main():
 
     y = df["LUNG_CANCER"]
 
+    # --------------------------------------------------------
+    # Create model
+    # --------------------------------------------------------
+
     model = create_model()
 
     # ========================================================
-    # ONE AND ONLY ONE MLflow RUN
+    # ONE AND ONLY ONE MLFLOW RUN
     # ========================================================
 
     with mlflow.start_run(
@@ -149,6 +156,25 @@ def main():
         print("MLFLOW RUN CREATED")
         print(f"Run ID: {run_id}")
         print("=" * 70)
+
+        # ----------------------------------------------------
+        # Run tags
+        # ----------------------------------------------------
+
+        mlflow.set_tag(
+            "algorithm",
+            ALGORITHM
+        )
+
+        mlflow.set_tag(
+            "project",
+            "lung-cancer-mlops"
+        )
+
+        mlflow.set_tag(
+            "dataset",
+            "survey_lung_cancer.csv"
+        )
 
         # ----------------------------------------------------
         # Parameters
@@ -261,7 +287,7 @@ def main():
 
         # ----------------------------------------------------
         # Save local model
-        # ----------------------------------------------------
+        # --------------------------------------------------------
 
         joblib.dump(
             model,
@@ -275,7 +301,8 @@ def main():
         # ----------------------------------------------------
         # Log model ONLY
         #
-        # DO NOT use registered_model_name here
+        # DO NOT register here.
+        # Registration happens after the run finishes.
         # ----------------------------------------------------
 
         model_info = mlflow.sklearn.log_model(
@@ -287,21 +314,19 @@ def main():
             f"Model logged: {model_info.model_uri}"
         )
 
-        print()
-        print("=" * 70)
-        print("TRAINING COMPLETED")
-        print("=" * 70)
+    # ========================================================
+    # MLFLOW RUN FINISHED
+    # ========================================================
 
-        print(f"Run ID    : {run_id}")
-        print(f"Algorithm : {ALGORITHM}")
-        print(f"Accuracy  : {accuracy:.4f}")
-        print(f"Precision : {precision:.4f}")
-        print(f"Recall    : {recall:.4f}")
-        print(f"F1        : {f1:.4f}")
-        print(f"ROC-AUC   : {roc_auc:.4f}")
+    print()
+    print("=" * 70)
+    print("MLFLOW RUN FINISHED")
+    print("=" * 70)
+
+    print(f"Run ID: {run_id}")
 
     # ========================================================
-    # REGISTER MODEL AFTER RUN HAS FINISHED
+    # REGISTER MODEL
     # ========================================================
 
     print()
@@ -328,9 +353,8 @@ def main():
             f"{REGISTERED_MODEL_NAME}"
         )
 
-    except Exception as e:
+    except Exception:
 
-        # Model already exists
         print(
             f"Registered model already exists: "
             f"{REGISTERED_MODEL_NAME}"
@@ -348,6 +372,91 @@ def main():
         run_id=run_id
     )
 
+    version = model_version.version
+
+    # ========================================================
+    # ADD MODEL VERSION DESCRIPTION
+    # ========================================================
+
+    client.update_model_version(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        description=(
+            f"Lung Cancer model trained using "
+            f"{ALGORITHM}. "
+            f"Accuracy={accuracy:.4f}, "
+            f"Precision={precision:.4f}, "
+            f"Recall={recall:.4f}, "
+            f"F1={f1:.4f}, "
+            f"ROC-AUC={roc_auc:.4f}. "
+            f"MLflow Run ID={run_id}."
+        )
+    )
+
+    # ========================================================
+    # ADD MODEL VERSION TAGS
+    # ========================================================
+
+    client.set_model_version_tag(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        key="algorithm",
+        value=ALGORITHM
+    )
+
+    client.set_model_version_tag(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        key="project",
+        value="lung-cancer-mlops"
+    )
+
+    client.set_model_version_tag(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        key="accuracy",
+        value=f"{accuracy:.4f}"
+    )
+
+    client.set_model_version_tag(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        key="precision",
+        value=f"{precision:.4f}"
+    )
+
+    client.set_model_version_tag(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        key="recall",
+        value=f"{recall:.4f}"
+    )
+
+    client.set_model_version_tag(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        key="f1",
+        value=f"{f1:.4f}"
+    )
+
+    client.set_model_version_tag(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        key="roc_auc",
+        value=f"{roc_auc:.4f}"
+    )
+
+    client.set_model_version_tag(
+        name=REGISTERED_MODEL_NAME,
+        version=version,
+        key="run_id",
+        value=run_id
+    )
+
+    # ========================================================
+    # FINAL OUTPUT
+    # ========================================================
+
     print()
     print("=" * 70)
     print("MODEL REGISTERED SUCCESSFULLY")
@@ -360,7 +469,7 @@ def main():
 
     print(
         f"Version          : "
-        f"{model_version.version}"
+        f"{version}"
     )
 
     print(
@@ -371,6 +480,26 @@ def main():
     print(
         f"Algorithm        : "
         f"{ALGORITHM}"
+    )
+
+    print(
+        f"Accuracy         : "
+        f"{accuracy:.4f}"
+    )
+
+    print(
+        f"F1               : "
+        f"{f1:.4f}"
+    )
+
+    print(
+        f"ROC-AUC          : "
+        f"{roc_auc:.4f}"
+    )
+
+    print(
+        f"S3 Model Path    : "
+        f"s3://$S3_BUCKET/models/{ALGORITHM}/model.pkl"
     )
 
     print("=" * 70)
