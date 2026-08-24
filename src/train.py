@@ -1,212 +1,123 @@
 import os
 import joblib
-import pandas as pd
 import mlflow
 import mlflow.sklearn
+import pandas as pd
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score
+)
 
-
-# --------------------------------------------------
-# Configuration
-# --------------------------------------------------
-
-TRAIN_FILE = "artifacts/train.csv"
-MODEL_FILE = "model/model.pkl"
-
-TARGET = "LUNG_CANCER"
+DATA_PATH = "artifacts/train.csv"
+MODEL_PATH = "model/model.pkl"
 
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://44.201.14.6:5000/"
+    "http://32.198.38.148:5000"
 )
 
 EXPERIMENT_NAME = "LungCancerPrediction"
 
-
-# --------------------------------------------------
-# Create directories
-# --------------------------------------------------
-
-os.makedirs("model", exist_ok=True)
+ALGORITHM = os.getenv("ALGORITHM", "logistic_regression")
 
 
-# --------------------------------------------------
-# Configure MLflow
-# --------------------------------------------------
+def create_model():
 
-mlflow.set_tracking_uri(
-    MLFLOW_TRACKING_URI
-)
+    if ALGORITHM == "logistic_regression":
 
-mlflow.set_experiment(
-    EXPERIMENT_NAME
-)
+        return LogisticRegression(
+            max_iter=1000,
+            random_state=42
+        )
 
+    elif ALGORITHM == "random_forest":
 
-print("MLflow Tracking URI:")
-print(MLFLOW_TRACKING_URI)
+        return RandomForestClassifier(
+            n_estimators=200,
+            max_depth=10,
+            random_state=42
+        )
 
-print("MLflow Experiment:")
-print(EXPERIMENT_NAME)
+    elif ALGORITHM == "svm":
 
+        return SVC(
+            probability=True,
+            kernel="rbf",
+            random_state=42
+        )
 
-# --------------------------------------------------
-# Load training data
-# --------------------------------------------------
-
-print("\nLoading training data...")
-
-train = pd.read_csv(TRAIN_FILE)
-
-print("Training data shape:", train.shape)
-
-
-# --------------------------------------------------
-# Separate features and target
-# --------------------------------------------------
-
-if TARGET not in train.columns:
-    raise ValueError(
-        f"Target column '{TARGET}' not found."
-    )
-
-X_train = train.drop(
-    columns=[TARGET]
-)
-
-y_train = train[TARGET]
+    else:
+        raise ValueError(
+            f"Unsupported algorithm: {ALGORITHM}"
+        )
 
 
-print("Feature shape:", X_train.shape)
-print("Target shape:", y_train.shape)
+def main():
+
+    print(f"Algorithm: {ALGORITHM}")
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+    mlflow.set_experiment(EXPERIMENT_NAME)
+
+    df = pd.read_csv(DATA_PATH)
+
+    X = df.drop("LUNG_CANCER", axis=1)
+    y = df["LUNG_CANCER"]
+
+    model = create_model()
+
+    with mlflow.start_run() as run:
+
+        mlflow.log_param(
+            "algorithm",
+            ALGORITHM
+        )
+
+        model.fit(X, y)
+
+        predictions = model.predict(X)
+
+        probabilities = model.predict_proba(X)[:, 1]
+
+        accuracy = accuracy_score(y, predictions)
+        precision = precision_score(y, predictions)
+        recall = recall_score(y, predictions)
+        f1 = f1_score(y, predictions)
+        roc_auc = roc_auc_score(y, probabilities)
+
+        mlflow.log_metric("accuracy", accuracy)
+        mlflow.log_metric("precision", precision)
+        mlflow.log_metric("recall", recall)
+        mlflow.log_metric("f1", f1)
+        mlflow.log_metric("roc_auc", roc_auc)
+
+        mlflow.log_params(model.get_params())
+
+        joblib.dump(model, MODEL_PATH)
+
+        mlflow.sklearn.log_model(
+            model,
+            "model"
+        )
+
+        print("MLflow Run ID:", run.info.run_id)
+        print("Algorithm:", ALGORITHM)
+        print("Accuracy:", accuracy)
+        print("Precision:", precision)
+        print("Recall:", recall)
+        print("F1:", f1)
+        print("ROC-AUC:", roc_auc)
+
+        print("Model saved:", MODEL_PATH)
 
 
-# --------------------------------------------------
-# Model parameters
-# --------------------------------------------------
-
-max_iter = 1000
-random_state = 42
-
-
-# --------------------------------------------------
-# Start MLflow run
-# --------------------------------------------------
-
-with mlflow.start_run() as run:
-
-    print("\nMLflow Run ID:")
-    print(run.info.run_id)
-
-    # ----------------------------------------------
-    # Create model
-    # ----------------------------------------------
-
-    model = LogisticRegression(
-        max_iter=max_iter,
-        random_state=random_state
-    )
-
-    # ----------------------------------------------
-    # Train model
-    # ----------------------------------------------
-
-    print("\nTraining model...")
-
-    model.fit(
-        X_train,
-        y_train
-    )
-
-    # ----------------------------------------------
-    # Predictions
-    # ----------------------------------------------
-
-    predictions = model.predict(
-        X_train
-    )
-
-    # ----------------------------------------------
-    # Training accuracy
-    # ----------------------------------------------
-
-    accuracy = accuracy_score(
-        y_train,
-        predictions
-    )
-
-    print(
-        "Training accuracy:",
-        accuracy
-    )
-
-    # ----------------------------------------------
-    # Log parameters
-    # ----------------------------------------------
-
-    mlflow.log_param(
-        "model_type",
-        "LogisticRegression"
-    )
-
-    mlflow.log_param(
-        "max_iter",
-        max_iter
-    )
-
-    mlflow.log_param(
-        "random_state",
-        random_state
-    )
-
-    mlflow.log_param(
-        "training_rows",
-        X_train.shape[0]
-    )
-
-    mlflow.log_param(
-        "feature_count",
-        X_train.shape[1]
-    )
-
-    # ----------------------------------------------
-    # Log metrics
-    # ----------------------------------------------
-
-    mlflow.log_metric(
-        "training_accuracy",
-        accuracy
-    )
-
-    # ----------------------------------------------
-    # Save model locally
-    # ----------------------------------------------
-
-    joblib.dump(
-        model,
-        MODEL_FILE
-    )
-
-    print(
-        "\nModel saved to:",
-        MODEL_FILE
-    )
-
-    # ----------------------------------------------
-    # Log model to MLflow
-    # ----------------------------------------------
-
-    mlflow.sklearn.log_model(
-        model,
-        name="lung_cancer_model"
-    )
-
-    print(
-        "\nModel logged to MLflow."
-    )
-
-    print(
-        "Run completed successfully."
-    )
+if __name__ == "__main__":
+    main()
