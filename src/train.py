@@ -31,7 +31,7 @@ MLFLOW_TRACKING_URI = os.getenv(
 
 EXPERIMENT_NAME = os.getenv(
     "MLFLOW_EXPERIMENT",
-    "LungCancerPrediction23"
+    "LungCancerPrediction231"
 )
 
 REGISTERED_MODEL_NAME = "LungCancerModel"
