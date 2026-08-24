@@ -2,129 +2,230 @@ name: Lung Cancer MLOps CI
 
 on:
   workflow_dispatch:
-
-env:
-  MLFLOW_TRACKING_URI: http://44.201.14.6:5000
-  AWS_REGION: ap-south-1
-  S3_BUCKET: lung-cancer-mlops-dinesh-202612
-
-permissions:
-  contents: read
-  id-token: write
+    inputs:
+      algorithm:
+        description: "Select ML algorithm"
+        required: true
+        default: "logistic_regression"
+        type: choice
+        options:
+          - logistic_regression
+          - random_forest
+          - decision_tree
 
 jobs:
+
   ml-pipeline:
+
     runs-on: ubuntu-latest
+
+    env:
+      MLFLOW_TRACKING_URI: http://44.201.14.6:5000
+      MLFLOW_EXPERIMENT: LungCancerPrediction
+
+      AWS_REGION: ap-south-1
+      S3_BUCKET: lung-cancer-mlops-dinesh-202612
+
+      ALGORITHM: ${{ inputs.algorithm }}
+
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
 
+      # --------------------------------------------------
       # 1. Checkout
+      # --------------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Python
+
+      # --------------------------------------------------
+      # 2. Setup Python
+      # --------------------------------------------------
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      # 3. Dependencies
+
+      # --------------------------------------------------
+      # 3. Install dependencies
+      # --------------------------------------------------
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
 
-      - name: Check GitHub OIDC token claims
-        shell: bash
-        env:
-          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
-        run: |
-          echo "Requesting GitHub OIDC token..."
+      # --------------------------------------------------
+      # 4. Configure AWS credentials using OIDC
+      # --------------------------------------------------
 
-          TOKEN=$(curl -sS \
-            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" \
-            | jq -r '.value')
-
-          PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f2)
-
-          case $((${#PAYLOAD} % 4)) in
-            2) PAYLOAD="${PAYLOAD}==" ;;
-            3) PAYLOAD="${PAYLOAD}=" ;;
-          esac
-
-          echo "$PAYLOAD" | base64 -d 2>/dev/null | jq '{
-            sub: .sub,
-            aud: .aud,
-            repository: .repository,
-            repository_id: .repository_id,
-            repository_owner: .repository_owner,
-            repository_owner_id: .repository_owner_id,
-            ref: .ref,
-            event_name: .event_name
-          }'
-      
-
-      # 4. AWS OIDC
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::821656895219:role/GitHubActionsLungCancerRole
-          aws-region: ap-south-1
+          aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
 
-      # 5. AWS test
+
+      # --------------------------------------------------
+      # 5. Verify AWS connection
+      # --------------------------------------------------
+
       - name: Verify AWS identity
         run: |
           aws sts get-caller-identity
 
-      # 6. Preprocess
+
+      # --------------------------------------------------
+      # 6. Display selected algorithm
+      # --------------------------------------------------
+
+      - name: Show configuration
+        run: |
+          echo "======================================"
+          echo "Lung Cancer MLOps Pipeline"
+          echo "======================================"
+          echo "Algorithm: ${ALGORITHM}"
+          echo "MLflow Experiment: ${MLFLOW_EXPERIMENT}"
+          echo "S3 Bucket: ${S3_BUCKET}"
+          echo "======================================"
+
+
+      # --------------------------------------------------
+      # 7. Preprocess
+      # --------------------------------------------------
+
       - name: Preprocess data
         run: |
           python src/preprocess.py
 
-      # 7. Train
+          echo "Checking artifacts..."
+          ls -lh artifacts/
+
+
+      # --------------------------------------------------
+      # 8. Train
+      # --------------------------------------------------
+
       - name: Train model
         run: |
           python src/train.py
 
-      # 8. Evaluate
+          echo "Checking model..."
+          ls -lh model/
+
+          test -f model/model.pkl
+
+
+      # --------------------------------------------------
+      # 9. Evaluate
+      # --------------------------------------------------
+
       - name: Evaluate model
         run: |
           python src/evaluate.py
 
-      # 9. Inference
+
+      # --------------------------------------------------
+      # 10. Inference
+      # --------------------------------------------------
+
       - name: Run inference
         run: |
           python src/inference.py
 
-      # 10. Tests
+
+      # --------------------------------------------------
+      # 11. Run tests
+      # --------------------------------------------------
+
       - name: Run tests
         run: |
           pytest -v
 
-      # 11. Upload processed data
+
+      # --------------------------------------------------
+      # 12. Upload processed datasets to S3
+      # --------------------------------------------------
+
       - name: Upload processed datasets to S3
         run: |
-          aws s3 cp artifacts/train.csv \
+
+          echo "Uploading train.csv..."
+
+          aws s3 cp \
+            artifacts/train.csv \
             s3://${S3_BUCKET}/artifacts/train.csv
 
-          aws s3 cp artifacts/test.csv \
+          echo "Uploading test.csv..."
+
+          aws s3 cp \
+            artifacts/test.csv \
             s3://${S3_BUCKET}/artifacts/test.csv
 
-      # 12. Upload model
+
+      # --------------------------------------------------
+      # 13. Upload model to algorithm-specific S3 folder
+      # --------------------------------------------------
+
       - name: Upload model to S3
         run: |
-          aws s3 cp model/model.pkl \
-            s3://${S3_BUCKET}/models/model.pkl
 
-      # 13. Verify S3
+          echo "Uploading model..."
+
+          aws s3 cp \
+            model/model.pkl \
+            s3://${S3_BUCKET}/models/${ALGORITHM}/model.pkl
+
+
+      # --------------------------------------------------
+      # 14. Verify S3 artifacts
+      # --------------------------------------------------
+
       - name: Verify S3 artifacts
         run: |
-          echo "Artifacts:"
-          aws s3 ls s3://${S3_BUCKET}/artifacts/
 
-          echo "Models:"
-          aws s3 ls s3://${S3_BUCKET}/models/
+          echo "======================================"
+          echo "S3 Artifacts"
+          echo "======================================"
+
+          aws s3 ls \
+            s3://${S3_BUCKET}/artifacts/
+
+          echo "======================================"
+          echo "S3 Models"
+          echo "======================================"
+
+          aws s3 ls \
+            s3://${S3_BUCKET}/models/ \
+            --recursive
+
+
+      # --------------------------------------------------
+      # 15. Pipeline completed
+      # --------------------------------------------------
+
+      - name: Pipeline completed
+        run: |
+
+          echo "======================================"
+          echo "PIPELINE SUCCESS"
+          echo "======================================"
+
+          echo "Algorithm:"
+          echo "${ALGORITHM}"
+
+          echo "MLflow Experiment:"
+          echo "${MLFLOW_EXPERIMENT}"
+
+          echo "Model:"
+          echo "s3://${S3_BUCKET}/models/${ALGORITHM}/model.pkl"
+
+          echo "======================================"
