@@ -11,7 +11,7 @@ on:
         options:
           - logistic_regression
           - random_forest
-          - decision_tree
+          - svm
 
 jobs:
 
