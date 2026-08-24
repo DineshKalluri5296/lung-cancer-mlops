@@ -16,43 +16,37 @@ from sklearn.metrics import (
     roc_auc_score
 )
 
+from mlflow.models import infer_signature
 
-# ============================================================
+
+# --------------------------------------------------
 # Configuration
-# ============================================================
+# --------------------------------------------------
 
-DATA_PATH = "artifacts/train.csv"
+TRAIN_DATA_PATH = "artifacts/train.csv"
+TEST_DATA_PATH = "artifacts/test.csv"
 
 MODEL_DIR = "model"
 MODEL_PATH = os.path.join(MODEL_DIR, "model.pkl")
 
-
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://32.198.38.148:5000"
+    "http://44.201.14.6:5000"
 )
 
-# IMPORTANT:
-# All algorithms use the SAME MLflow experiment
 EXPERIMENT_NAME = "LungCancerPrediction23"
 
-# GitHub Actions will provide this value
+REGISTERED_MODEL_NAME = "LungCancerModel"
+
 ALGORITHM = os.getenv(
     "ALGORITHM",
     "logistic_regression"
 )
 
 
-# ============================================================
-# Create model directory
-# ============================================================
-
-os.makedirs(MODEL_DIR, exist_ok=True)
-
-
-# ============================================================
+# --------------------------------------------------
 # Create model
-# ============================================================
+# --------------------------------------------------
 
 def create_model():
 
@@ -86,9 +80,9 @@ def create_model():
         )
 
 
-# ============================================================
+# --------------------------------------------------
 # Main
-# ============================================================
+# --------------------------------------------------
 
 def main():
 
@@ -96,13 +90,13 @@ def main():
     print("LUNG CANCER MODEL TRAINING")
     print("=" * 60)
 
-    print("Algorithm:", ALGORITHM)
-    print("MLflow Experiment:", EXPERIMENT_NAME)
-    print("MLflow Tracking URI:", MLFLOW_TRACKING_URI)
+    print(f"Algorithm: {ALGORITHM}")
+    print(f"Experiment: {EXPERIMENT_NAME}")
+    print(f"Registered Model: {REGISTERED_MODEL_NAME}")
 
-    # --------------------------------------------------------
+    # --------------------------------------------------
     # MLflow configuration
-    # --------------------------------------------------------
+    # --------------------------------------------------
 
     mlflow.set_tracking_uri(
         MLFLOW_TRACKING_URI
@@ -112,54 +106,141 @@ def main():
         EXPERIMENT_NAME
     )
 
-    # --------------------------------------------------------
+    print(
+        f"MLflow Tracking URI: "
+        f"{MLFLOW_TRACKING_URI}"
+    )
+
+    # --------------------------------------------------
     # Load training data
-    # --------------------------------------------------------
+    # --------------------------------------------------
 
-    print("Loading training data...")
+    print("\nLoading training data...")
 
-    df = pd.read_csv(DATA_PATH)
+    train_df = pd.read_csv(
+        TRAIN_DATA_PATH
+    )
 
-    print("Training data shape:", df.shape)
+    print(
+        f"Training data shape: "
+        f"{train_df.shape}"
+    )
 
-    X = df.drop(
-        "LUNG_CANCER",
+    # --------------------------------------------------
+    # Load test data
+    # --------------------------------------------------
+
+    print("\nLoading test data...")
+
+    test_df = pd.read_csv(
+        TEST_DATA_PATH
+    )
+
+    print(
+        f"Test data shape: "
+        f"{test_df.shape}"
+    )
+
+    # --------------------------------------------------
+    # Separate features and target
+    # --------------------------------------------------
+
+    target_column = "LUNG_CANCER"
+
+    X_train = train_df.drop(
+        target_column,
         axis=1
     )
 
-    y = df["LUNG_CANCER"]
+    y_train = train_df[
+        target_column
+    ]
 
-    print("Feature shape:", X.shape)
-    print("Target shape:", y.shape)
+    X_test = test_df.drop(
+        target_column,
+        axis=1
+    )
 
-    # --------------------------------------------------------
+    y_test = test_df[
+        target_column
+    ]
+
+    print(
+        f"\nTraining features: "
+        f"{X_train.shape}"
+    )
+
+    print(
+        f"Training target: "
+        f"{y_train.shape}"
+    )
+
+    print(
+        f"Test features: "
+        f"{X_test.shape}"
+    )
+
+    print(
+        f"Test target: "
+        f"{y_test.shape}"
+    )
+
+    # --------------------------------------------------
     # Create model
-    # --------------------------------------------------------
+    # --------------------------------------------------
 
     model = create_model()
 
-    print("Model:", model)
+    print(
+        f"\nCreated model: "
+        f"{model.__class__.__name__}"
+    )
 
-    # --------------------------------------------------------
+    # --------------------------------------------------
     # Start MLflow run
-    # --------------------------------------------------------
+    # --------------------------------------------------
 
     with mlflow.start_run() as run:
 
-        print("MLflow Run ID:", run.info.run_id)
+        run_id = run.info.run_id
 
-        # ----------------------------------------------------
-        # Log algorithm
-        # ----------------------------------------------------
+        print(
+            f"\nMLflow Run ID: "
+            f"{run_id}"
+        )
+
+        # --------------------------------------------------
+        # MLflow tags
+        # --------------------------------------------------
+
+        mlflow.set_tag(
+            "project",
+            "lung-cancer-mlops"
+        )
+
+        mlflow.set_tag(
+            "algorithm",
+            ALGORITHM
+        )
+
+        mlflow.set_tag(
+            "dataset",
+            "survey_lung_cancer.csv"
+        )
+
+        mlflow.set_tag(
+            "environment",
+            "ci"
+        )
+
+        # --------------------------------------------------
+        # Log basic parameters
+        # --------------------------------------------------
 
         mlflow.log_param(
             "algorithm",
             ALGORITHM
         )
-
-        # ----------------------------------------------------
-        # Log dataset information
-        # ----------------------------------------------------
 
         mlflow.log_param(
             "dataset",
@@ -168,68 +249,89 @@ def main():
 
         mlflow.log_param(
             "training_rows",
-            X.shape[0]
+            len(X_train)
+        )
+
+        mlflow.log_param(
+            "test_rows",
+            len(X_test)
         )
 
         mlflow.log_param(
             "features",
-            X.shape[1]
+            X_train.shape[1]
         )
 
-        # ----------------------------------------------------
-        # Train model
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # Log model parameters
+        # --------------------------------------------------
 
-        print("Training model...")
+        mlflow.log_params(
+            model.get_params()
+        )
+
+        # --------------------------------------------------
+        # Train
+        # --------------------------------------------------
+
+        print("\nTraining model...")
 
         model.fit(
-            X,
-            y
+            X_train,
+            y_train
         )
 
-        # ----------------------------------------------------
-        # Prediction
-        # ----------------------------------------------------
+        print("Training completed.")
 
-        predictions = model.predict(X)
+        # --------------------------------------------------
+        # Prediction on TEST data
+        # --------------------------------------------------
 
-        probabilities = model.predict_proba(X)[:, 1]
+        print("\nEvaluating model on test data...")
 
-        # ----------------------------------------------------
-        # Metrics
-        # ----------------------------------------------------
+        predictions = model.predict(
+            X_test
+        )
+
+        probabilities = model.predict_proba(
+            X_test
+        )[:, 1]
+
+        # --------------------------------------------------
+        # Calculate metrics
+        # --------------------------------------------------
 
         accuracy = accuracy_score(
-            y,
+            y_test,
             predictions
         )
 
         precision = precision_score(
-            y,
+            y_test,
             predictions,
             zero_division=0
         )
 
         recall = recall_score(
-            y,
+            y_test,
             predictions,
             zero_division=0
         )
 
         f1 = f1_score(
-            y,
+            y_test,
             predictions,
             zero_division=0
         )
 
         roc_auc = roc_auc_score(
-            y,
+            y_test,
             probabilities
         )
 
-        # ----------------------------------------------------
-        # Log metrics to MLflow
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # Log metrics
+        # --------------------------------------------------
 
         mlflow.log_metric(
             "accuracy",
@@ -256,17 +358,18 @@ def main():
             roc_auc
         )
 
-        # ----------------------------------------------------
-        # Log model parameters
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # Create model directory
+        # --------------------------------------------------
 
-        mlflow.log_params(
-            model.get_params()
+        os.makedirs(
+            MODEL_DIR,
+            exist_ok=True
         )
 
-        # ----------------------------------------------------
-        # Save model locally
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # Save local model
+        # --------------------------------------------------
 
         joblib.dump(
             model,
@@ -274,44 +377,104 @@ def main():
         )
 
         print(
-            "Model saved:",
-            MODEL_PATH
+            f"\nLocal model saved to: "
+            f"{MODEL_PATH}"
         )
 
-        # ----------------------------------------------------
-        # Log model to MLflow
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # MLflow model signature
+        # --------------------------------------------------
 
-        mlflow.sklearn.log_model(
+        predictions_for_signature = model.predict(
+            X_test.head(5)
+        )
+
+        signature = infer_signature(
+            X_test,
+            predictions_for_signature
+        )
+
+        # --------------------------------------------------
+        # MLflow input example
+        # --------------------------------------------------
+
+        input_example = X_test.head(1)
+
+        # --------------------------------------------------
+        # Log + Register model
+        # --------------------------------------------------
+
+        print(
+            "\nLogging model to MLflow..."
+        )
+
+        print(
+            f"Registering as: "
+            f"{REGISTERED_MODEL_NAME}"
+        )
+
+        model_info = mlflow.sklearn.log_model(
             model,
-            artifact_path="model"
+            name="model",
+            signature=signature,
+            input_example=input_example,
+            registered_model_name=REGISTERED_MODEL_NAME
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Print results
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
-        print("=" * 60)
-        print("TRAINING COMPLETED")
-        print("=" * 60)
-
-        print("MLflow Run ID:", run.info.run_id)
-        print("Algorithm:", ALGORITHM)
-
-        print("Accuracy:", accuracy)
-        print("Precision:", precision)
-        print("Recall:", recall)
-        print("F1:", f1)
-        print("ROC-AUC:", roc_auc)
-
-        print("Local model:", MODEL_PATH)
-
+        print("\n" + "=" * 60)
+        print("MODEL RESULTS")
         print("=" * 60)
 
+        print(
+            f"Algorithm : {ALGORITHM}"
+        )
 
-# ============================================================
+        print(
+            f"Accuracy  : {accuracy:.4f}"
+        )
+
+        print(
+            f"Precision : {precision:.4f}"
+        )
+
+        print(
+            f"Recall    : {recall:.4f}"
+        )
+
+        print(
+            f"F1 Score  : {f1:.4f}"
+        )
+
+        print(
+            f"ROC-AUC   : {roc_auc:.4f}"
+        )
+
+        print(
+            f"Run ID    : {run_id}"
+        )
+
+        print(
+            f"Model     : {REGISTERED_MODEL_NAME}"
+        )
+
+        print(
+            f"Model URI : {model_info.model_uri}"
+        )
+
+        print("=" * 60)
+
+        print(
+            "\nTraining and registration completed successfully."
+        )
+
+
+# --------------------------------------------------
 # Entry point
-# ============================================================
+# --------------------------------------------------
 
 if __name__ == "__main__":
     main()
