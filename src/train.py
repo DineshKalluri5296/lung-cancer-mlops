@@ -34,7 +34,7 @@ EXPERIMENT_NAME = os.getenv(
     "LungCancerPrediction231"
 )
 
-REGISTERED_MODEL_NAME = "LungCancerModel"
+REGISTERED_MODEL_NAME = "LungCancerModel69"
 
 ALGORITHM = os.getenv(
     "ALGORITHM",
