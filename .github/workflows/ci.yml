@@ -21,7 +21,7 @@ jobs:
 
     env:
       MLFLOW_TRACKING_URI: http://44.201.14.6:5000
-      MLFLOW_EXPERIMENT: LungCancerPrediction
+      MLFLOW_EXPERIMENT: LungCancerPrediction2311
 
       AWS_REGION: ap-south-1
       S3_BUCKET: lung-cancer-mlops-dinesh-202612
