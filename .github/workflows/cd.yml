@@ -1,144 +1,144 @@
-name: CD
+# name: CD
 
-on:
+# on:
 
-  push:
+#   push:
 
-    branches:
-      - main
+#     branches:
+#       - main
 
 
-permissions:
+# permissions:
 
-  contents: write
+#   contents: write
 
-  id-token: write
+#   id-token: write
 
 
-env:
+# env:
 
-  AWS_REGION: ap-south-1
+#   AWS_REGION: ap-south-1
 
-  ECR_REPOSITORY: lung-cancer-mlops
+#   ECR_REPOSITORY: lung-cancer-mlops
 
-  IMAGE_TAG: ${{ github.sha }}
+#   IMAGE_TAG: ${{ github.sha }}
 
 
-jobs:
+# jobs:
 
-  deploy:
+#   deploy:
 
-    runs-on: ubuntu-latest
+#     runs-on: ubuntu-latest
 
 
-    steps:
+#     steps:
 
 
-      # ------------------------------------------------
-      # Checkout
-      # ------------------------------------------------
+#       # ------------------------------------------------
+#       # Checkout
+#       # ------------------------------------------------
 
-      - name: Checkout code
+#       - name: Checkout code
 
-        uses: actions/checkout@v4
+#         uses: actions/checkout@v4
 
 
-      # ------------------------------------------------
-      # Configure AWS
-      # ------------------------------------------------
+#       # ------------------------------------------------
+#       # Configure AWS
+#       # ------------------------------------------------
 
-      - name: Configure AWS credentials
+#       - name: Configure AWS credentials
 
-        uses: aws-actions/configure-aws-credentials@v4
+#         uses: aws-actions/configure-aws-credentials@v4
 
-        with:
+#         with:
 
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+#           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
-          aws-region: ${{ env.AWS_REGION }}
+#           aws-region: ${{ env.AWS_REGION }}
 
 
-      # ------------------------------------------------
-      # Login to ECR
-      # ------------------------------------------------
+#       # ------------------------------------------------
+#       # Login to ECR
+#       # ------------------------------------------------
 
-      - name: Login to Amazon ECR
+#       - name: Login to Amazon ECR
 
-        id: login-ecr
+#         id: login-ecr
 
-        uses: aws-actions/amazon-ecr-login@v2
+#         uses: aws-actions/amazon-ecr-login@v2
 
 
-      # ------------------------------------------------
-      # Get ECR registry
-      # ------------------------------------------------
+#       # ------------------------------------------------
+#       # Get ECR registry
+#       # ------------------------------------------------
 
-      - name: Set ECR registry
+#       - name: Set ECR registry
 
-        run: |
+#         run: |
 
-          echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
+#           echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
 
 
-      # ------------------------------------------------
-      # Build Docker image
-      # ------------------------------------------------
+#       # ------------------------------------------------
+#       # Build Docker image
+#       # ------------------------------------------------
 
-      - name: Build Docker image
+#       - name: Build Docker image
 
-        run: |
+#         run: |
 
-          docker build \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            .
+#           docker build \
+#             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+#             .
 
-          docker tag \
-            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            $ECR_REGISTRY/$ECR_REPOSITORY:latest
+#           docker tag \
+#             $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+#             $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
 
-      # ------------------------------------------------
-      # Push Docker image
-      # ------------------------------------------------
+#       # ------------------------------------------------
+#       # Push Docker image
+#       # ------------------------------------------------
 
-      - name: Push Docker image
+#       - name: Push Docker image
 
-        run: |
+#         run: |
 
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+#           docker push \
+#             $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-          docker push \
-            $ECR_REGISTRY/$ECR_REPOSITORY:latest
+#           docker push \
+#             $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
 
-      # ------------------------------------------------
-      # Update Kubernetes manifest
-      # ------------------------------------------------
+#       # ------------------------------------------------
+#       # Update Kubernetes manifest
+#       # ------------------------------------------------
 
-      - name: Update deployment image
+#       - name: Update deployment image
 
-        run: |
+#         run: |
 
-          sed -i \
-          "s|image:.*|image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|" \
-          k8s/deployment.yaml
+#           sed -i \
+#           "s|image:.*|image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|" \
+#           k8s/deployment.yaml
 
 
-      # ------------------------------------------------
-      # Commit GitOps change
-      # ------------------------------------------------
+#       # ------------------------------------------------
+#       # Commit GitOps change
+#       # ------------------------------------------------
 
-      - name: Commit Kubernetes manifest
+#       - name: Commit Kubernetes manifest
 
-        run: |
+#         run: |
 
-          git config user.name "github-actions"
+#           git config user.name "github-actions"
 
-          git config user.email "github-actions@github.com"
+#           git config user.email "github-actions@github.com"
 
-          git add k8s/deployment.yaml
+#           git add k8s/deployment.yaml
 
-          git commit -m "Update lung cancer image to $IMAGE_TAG" || echo "No changes"
+#           git commit -m "Update lung cancer image to $IMAGE_TAG" || echo "No changes"
 
-          git push
+#           git push
