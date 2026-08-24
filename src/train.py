@@ -19,7 +19,7 @@ TARGET = "LUNG_CANCER"
 
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://32.198.38.148:5000/"
+    "http://44.201.14.6:5000/"
 )
 
 EXPERIMENT_NAME = "LungCancerPrediction"
