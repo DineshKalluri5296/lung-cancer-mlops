@@ -31,10 +31,10 @@ MLFLOW_TRACKING_URI = os.getenv(
 
 EXPERIMENT_NAME = os.getenv(
     "MLFLOW_EXPERIMENT",
-    "LungCancerPrediction231"
+    "LungCancerPrediction2311"
 )
 
-REGISTERED_MODEL_NAME = "LungCancerModel69"
+REGISTERED_MODEL_NAME = "LungCancerModel691"
 
 ALGORITHM = os.getenv(
     "ALGORITHM",
@@ -72,7 +72,6 @@ def create_model():
         )
 
     else:
-
         raise ValueError(
             f"Unsupported algorithm: {ALGORITHM}"
         )
@@ -88,9 +87,10 @@ def main():
     print("LUNG CANCER MODEL TRAINING")
     print("=" * 70)
 
-    print(f"Algorithm       : {ALGORITHM}")
-    print(f"Experiment      : {EXPERIMENT_NAME}")
-    print(f"Tracking URI    : {MLFLOW_TRACKING_URI}")
+    print(f"Algorithm    : {ALGORITHM}")
+    print(f"Experiment   : {EXPERIMENT_NAME}")
+    print(f"Tracking URI : {MLFLOW_TRACKING_URI}")
+    print(f"Model        : {REGISTERED_MODEL_NAME}")
     print("=" * 70)
 
     # --------------------------------------------------------
@@ -104,11 +104,13 @@ def main():
     # --------------------------------------------------------
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-
     mlflow.set_experiment(EXPERIMENT_NAME)
 
+    # Disable automatic logging if enabled elsewhere
+    mlflow.autolog(disable=True)
+
     # --------------------------------------------------------
-    # Load training data
+    # Load data
     # --------------------------------------------------------
 
     print(f"Reading dataset: {DATA_PATH}")
@@ -127,11 +129,11 @@ def main():
     model = create_model()
 
     # --------------------------------------------------------
-    # ONE MLflow run
+    # ONE AND ONLY ONE MLflow RUN
     # --------------------------------------------------------
 
     with mlflow.start_run(
-        run_name=f"{ALGORITHM}"
+        run_name=ALGORITHM
     ) as run:
 
         run_id = run.info.run_id
@@ -142,7 +144,7 @@ def main():
         print("=" * 70)
 
         # ----------------------------------------------------
-        # Log basic parameters
+        # Parameters
         # ----------------------------------------------------
 
         mlflow.log_param(
@@ -217,30 +219,11 @@ def main():
         # Log metrics
         # ----------------------------------------------------
 
-        mlflow.log_metric(
-            "accuracy",
-            accuracy
-        )
-
-        mlflow.log_metric(
-            "precision",
-            precision
-        )
-
-        mlflow.log_metric(
-            "recall",
-            recall
-        )
-
-        mlflow.log_metric(
-            "f1",
-            f1
-        )
-
-        mlflow.log_metric(
-            "roc_auc",
-            roc_auc
-        )
+        mlflow.log_metric("accuracy", accuracy)
+        mlflow.log_metric("precision", precision)
+        mlflow.log_metric("recall", recall)
+        mlflow.log_metric("f1", f1)
+        mlflow.log_metric("roc_auc", roc_auc)
 
         # ----------------------------------------------------
         # Log model parameters
@@ -251,7 +234,7 @@ def main():
         )
 
         # ----------------------------------------------------
-        # Save model locally
+        # Save local model
         # ----------------------------------------------------
 
         joblib.dump(
@@ -262,7 +245,7 @@ def main():
         print(f"Model saved: {MODEL_PATH}")
 
         # ----------------------------------------------------
-        # Log and register model
+        # Log model + Register model
         # ----------------------------------------------------
 
         mlflow.sklearn.log_model(
@@ -279,17 +262,14 @@ def main():
         print("TRAINING COMPLETED")
         print("=" * 70)
 
-        print(f"Run ID      : {run_id}")
-        print(f"Algorithm   : {ALGORITHM}")
-        print(f"Accuracy    : {accuracy:.4f}")
-        print(f"Precision   : {precision:.4f}")
-        print(f"Recall      : {recall:.4f}")
-        print(f"F1          : {f1:.4f}")
-        print(f"ROC-AUC     : {roc_auc:.4f}")
-
-        print(
-            f"Registered Model: {REGISTERED_MODEL_NAME}"
-        )
+        print(f"Run ID       : {run_id}")
+        print(f"Algorithm    : {ALGORITHM}")
+        print(f"Accuracy     : {accuracy:.4f}")
+        print(f"Precision    : {precision:.4f}")
+        print(f"Recall       : {recall:.4f}")
+        print(f"F1           : {f1:.4f}")
+        print(f"ROC-AUC      : {roc_auc:.4f}")
+        print(f"Model        : {REGISTERED_MODEL_NAME}")
 
         print("=" * 70)
 
