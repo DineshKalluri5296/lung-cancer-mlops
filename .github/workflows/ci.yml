@@ -25,8 +25,8 @@ jobs:
       # MLflow
       # ==================================================
 
-      MLFLOW_TRACKING_URI: http://34.200.234.63:5000
-      MLFLOW_EXPERIMENT: LungCancerPrediction22
+      MLFLOW_TRACKING_URI: http://100.60.81.211:5000/
+      MLFLOW_EXPERIMENT: LungCancerPrediction212
 
       # ==================================================
       # AWS
@@ -35,13 +35,13 @@ jobs:
       AWS_REGION: ap-south-1
       AWS_ACCOUNT_ID: "821656895219"
 
-      S3_BUCKET: lung-cancer-mlops-dinesh-202612
+      S3_BUCKET: lung-cancer-prediction
 
       # ==================================================
       # ECR
       # ==================================================
 
-      ECR_REPOSITORY: lung-cancer-mlops
+      ECR_REPOSITORY: lung-cancer
 
       # ==================================================
       # Algorithm
@@ -92,7 +92,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::821656895219:role/GitHubActionsLungCancerRole
+          role-to-assume: arn:aws:iam::821656895219:role/GitHubActionsLungCancerRole1
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
 
