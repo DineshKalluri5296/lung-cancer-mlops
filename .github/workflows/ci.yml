@@ -74,7 +74,7 @@ jobs:
 
 
       # ==================================================
-      # 3. Install dependencies
+      # 3. Install Python dependencies
       # ==================================================
 
       - name: Install dependencies
@@ -108,16 +108,14 @@ jobs:
 
 
       # ==================================================
-      # 6. Display configuration
+      # 6. Show configuration
       # ==================================================
 
       - name: Show configuration
         run: |
 
           echo "======================================"
-
-          echo "Lung Cancer MLOps Pipeline"
-
+          echo "LUNG CANCER MLOps CI PIPELINE"
           echo "======================================"
 
           echo "Algorithm:"
@@ -145,11 +143,18 @@ jobs:
       - name: Preprocess data
         run: |
 
+          echo "Running preprocessing..."
+
           python src/preprocess.py
 
           echo "Checking artifacts..."
 
           ls -lh artifacts/
+
+          test -f artifacts/train.csv
+          test -f artifacts/test.csv
+
+          echo "Preprocessing completed successfully."
 
 
       # ==================================================
@@ -159,13 +164,17 @@ jobs:
       - name: Train model
         run: |
 
+          echo "Training ${ALGORITHM} model..."
+
           python src/train.py
 
-          echo "Checking model..."
+          echo "Checking model directory..."
 
           ls -lh model/
 
           test -f model/model.pkl
+
+          echo "Model training completed successfully."
 
 
       # ==================================================
@@ -175,31 +184,78 @@ jobs:
       - name: Evaluate model
         run: |
 
+          echo "Evaluating model..."
+
           python src/evaluate.py
+
+          echo "Evaluation completed successfully."
 
 
       # ==================================================
-      # 10. Inference
+      # 10. Inference test
       # ==================================================
 
       - name: Run inference
         run: |
 
+          echo "Running inference test..."
+
           python src/inference.py
+
+          echo "Inference completed successfully."
 
 
       # ==================================================
-      # 11. Tests
+      # 11. Unit tests
       # ==================================================
 
       - name: Run tests
         run: |
 
+          echo "Running pytest..."
+
           pytest -v
+
+          echo "Tests completed successfully."
 
 
       # ==================================================
-      # 12. Upload processed datasets to S3
+      # 12. Verify application files
+      #
+      # IMPORTANT FOR DOCKER IMAGE
+      # ==================================================
+
+      - name: Verify application files
+        run: |
+
+          echo "======================================"
+          echo "Checking Docker application files"
+          echo "======================================"
+
+          echo "Repository files:"
+          ls -la
+
+          echo ""
+          echo "Model directory:"
+          ls -lh model/
+
+          echo ""
+
+          test -f app.py
+          test -f Dockerfile
+          test -f requirements.txt
+          test -f model/model.pkl
+
+          echo "app.py found"
+          echo "Dockerfile found"
+          echo "requirements.txt found"
+          echo "model/model.pkl found"
+
+          echo "======================================"
+
+
+      # ==================================================
+      # 13. Upload processed datasets to S3
       # ==================================================
 
       - name: Upload processed datasets to S3
@@ -220,7 +276,7 @@ jobs:
 
 
       # ==================================================
-      # 13. Upload model to S3
+      # 14. Upload model to S3
       # ==================================================
 
       - name: Upload model to S3
@@ -234,26 +290,23 @@ jobs:
 
 
       # ==================================================
-      # 14. Verify S3
+      # 15. Verify S3
       # ==================================================
 
       - name: Verify S3 artifacts
         run: |
 
           echo "======================================"
-
-          echo "S3 Artifacts"
-
+          echo "S3 ARTIFACTS"
           echo "======================================"
 
           aws s3 ls \
             s3://${S3_BUCKET}/artifacts/
 
+          echo ""
 
           echo "======================================"
-
-          echo "S3 Models"
-
+          echo "S3 MODELS"
           echo "======================================"
 
           aws s3 ls \
@@ -262,7 +315,7 @@ jobs:
 
 
       # ==================================================
-      # 15. Login to Amazon ECR
+      # 16. Login to Amazon ECR
       # ==================================================
 
       - name: Login to Amazon ECR
@@ -270,7 +323,7 @@ jobs:
 
 
       # ==================================================
-      # 16. Create Docker image tag
+      # 17. Create unique Docker image tag
       # ==================================================
 
       - name: Create Docker image tag
@@ -285,17 +338,12 @@ jobs:
           IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
 
           echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
-
           echo "ECR_REGISTRY=${ECR_REGISTRY}" >> $GITHUB_ENV
-
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
-
           echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
 
           echo "======================================"
-
-          echo "Docker Image"
-
+          echo "DOCKER IMAGE"
           echo "======================================"
 
           echo "Registry:"
@@ -314,48 +362,105 @@ jobs:
 
 
       # ==================================================
-      # 17. Build Docker image
+      # 18. Build Docker image
       # ==================================================
 
       - name: Build Docker image
         run: |
 
-          echo "Building Docker image..."
+          echo "======================================"
+          echo "BUILDING DOCKER IMAGE"
+          echo "======================================"
 
           docker build \
+            --pull \
             -t "${IMAGE_URI}" \
             .
 
+          echo ""
           echo "Docker image built successfully."
 
           docker images
 
 
       # ==================================================
-      # 18. Push Docker image to ECR
+      # 19. Test Docker image locally
+      # ==================================================
+
+      - name: Test Docker image
+        run: |
+
+          echo "======================================"
+          echo "TESTING DOCKER IMAGE"
+          echo "======================================"
+
+          docker run \
+            -d \
+            --name lung-cancer-test \
+            -p 8000:8000 \
+            "${IMAGE_URI}"
+
+          echo "Waiting for application..."
+
+          sleep 10
+
+          echo ""
+          echo "Container status:"
+
+          docker ps -a
+
+          echo ""
+          echo "Testing health endpoint..."
+
+          curl --fail \
+            http://localhost:8000/health
+
+          echo ""
+          echo "Testing root endpoint..."
+
+          curl --fail \
+            http://localhost:8000/
+
+          echo ""
+          echo "Docker application test successful."
+
+          echo ""
+          echo "Container logs:"
+
+          docker logs lung-cancer-test
+
+          docker stop lung-cancer-test
+          docker rm lung-cancer-test
+
+
+      # ==================================================
+      # 20. Push Docker image to ECR
       # ==================================================
 
       - name: Push Docker image to ECR
         run: |
 
-          echo "Pushing Docker image..."
+          echo "======================================"
+          echo "PUSHING DOCKER IMAGE TO ECR"
+          echo "======================================"
 
           docker push "${IMAGE_URI}"
 
+          echo ""
           echo "Docker image pushed successfully."
+
+          echo "${IMAGE_URI}"
 
 
       # ==================================================
-      # 19. Verify ECR image
+      # 21. Verify ECR image
       # ==================================================
 
       - name: Verify ECR image
         run: |
 
           echo "======================================"
-
-          echo "ECR Image"
-
+          echo "VERIFYING ECR IMAGE"
           echo "======================================"
 
           aws ecr describe-images \
@@ -363,20 +468,19 @@ jobs:
             --image-ids imageTag="${IMAGE_TAG}" \
             --region "${AWS_REGION}"
 
-          echo "======================================"
+          echo ""
+          echo "ECR image verified successfully."
 
 
       # ==================================================
-      # 20. Pipeline completed
+      # 22. Pipeline completed
       # ==================================================
 
       - name: Pipeline completed
         run: |
 
           echo "======================================"
-
           echo "CI PIPELINE SUCCESS"
-
           echo "======================================"
 
           echo "Algorithm:"
@@ -397,10 +501,6 @@ jobs:
           echo "Docker Image:"
           echo "${IMAGE_URI}"
 
-          echo "======================================"
+          
 
-          echo "Ready for Phase 3"
-
-          echo "EKS + Kubernetes + ArgoCD"
-
-          echo "======================================"
+          
