@@ -32,10 +32,10 @@ jobs:
       # AWS
       # ==================================================
 
-      AWS_REGION: ap-south-1
+      AWS_REGION: us-east-1
       AWS_ACCOUNT_ID: "821656895219"
 
-      S3_BUCKET: lung-cancer-prediction
+      S3_BUCKET: lung-cancer-mlops-dinesh-202612 
 
       # ==================================================
       # ECR
@@ -92,7 +92,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::821656895219:role/GitHubActionsLungCancerRole1
+          role-to-assume: arn:aws:iam::821656895219:role/GitHubActionsLungCancerRole
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
 
