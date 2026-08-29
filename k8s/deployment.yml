@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lung-cancer-api
+  namespace: lung-cancer
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: lung-cancer-api
+
+  template:
+    metadata:
+      labels:
+        app: lung-cancer-api
+
+    spec:
+      containers:
+        - name: lung-cancer-api
+
+          image: 312106747535.dkr.ecr.us-east-1.amazonaws.com/lung-cancer:logistic_regression-d2d390b
+
+          ports:
+            - containerPort: 8000
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
