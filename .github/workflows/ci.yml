@@ -41,7 +41,7 @@ jobs:
       # ECR
       # ==================================================
 
-      ECR_REPOSITORY: lung-cancer-mlops
+      ECR_REPOSITORY: lung-cancer
 
       # ==================================================
       # Algorithm
