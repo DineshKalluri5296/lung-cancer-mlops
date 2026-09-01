@@ -20,7 +20,7 @@ spec:
       containers:
         - name: lung-cancer-api
 
-          image: 312106747535.dkr.ecr.us-east-1.amazonaws.com/lung-cancer:logistic_regression-d2d390b
+          image: 821656895219.dkr.ecr.us-east-1.amazonaws.com/lung-cancer:logistic_regression-8111909
 
           ports:
             - containerPort: 8000
