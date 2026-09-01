@@ -28,12 +28,12 @@ MODEL_PATH = "model/model.pkl"
 
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://52.90.116.60:5000"
+    "http://44.204.120.215:5000/"
 )
 
 EXPERIMENT_NAME = os.getenv(
     "MLFLOW_EXPERIMENT",
-    "LungCancerPrediction"
+    "LungCancerPrediction_mlops"
 )
 
 REGISTERED_MODEL_NAME = "LungCancerModelprediction"
