@@ -28,7 +28,7 @@ MODEL_PATH = "model/model.pkl"
 
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://44.204.120.215:5000/"
+    "http://100.27.41.45:5000/"
 )
 
 EXPERIMENT_NAME = os.getenv(
