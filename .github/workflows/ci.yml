@@ -25,17 +25,24 @@ jobs:
       # MLflow
       # ==================================================
 
-      MLFLOW_TRACKING_URI: http://100.27.41.45:5000/
-      MLFLOW_EXPERIMENT: LungCancerPrediction_mlops
+      # CHANGE THIS to your NEW MLflow EC2 public IP
+      MLFLOW_TRACKING_URI: http://16.176.157.241:5000
+
+      MLFLOW_EXPERIMENT: LungCancerPrediction
+
 
       # ==================================================
       # AWS
       # ==================================================
 
-      AWS_REGION: us-east-1
-      AWS_ACCOUNT_ID: "821656895219"
+      AWS_REGION: ap-southeast-2
 
-      S3_BUCKET: lung-cancer234 
+      # CHANGE THIS to your CURRENT AWS account ID
+      AWS_ACCOUNT_ID: "962453725761"
+
+      # CHANGE THIS to your S3 bucket
+      S3_BUCKET: lung-cancer-mlops234
+
 
       # ==================================================
       # ECR
@@ -43,15 +50,17 @@ jobs:
 
       ECR_REPOSITORY: lung-cancer
 
+
       # ==================================================
       # Algorithm
       # ==================================================
 
       ALGORITHM: ${{ inputs.algorithm }}
 
+
     permissions:
       contents: read
-      id-token: write
+
 
     steps:
 
@@ -87,14 +96,20 @@ jobs:
 
       # ==================================================
       # 4. Configure AWS credentials
+      #
+      # NO OIDC
+      # Uses GitHub Repository Secrets
       # ==================================================
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::821656895219:role/GitHubActionsLungCancerRole
+
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
           aws-region: ${{ env.AWS_REGION }}
-          audience: sts.amazonaws.com
 
 
       # ==================================================
@@ -103,6 +118,10 @@ jobs:
 
       - name: Verify AWS identity
         run: |
+
+          echo "======================================"
+          echo "AWS IDENTITY"
+          echo "======================================"
 
           aws sts get-caller-identity
 
@@ -124,6 +143,9 @@ jobs:
           echo "MLflow Experiment:"
           echo "${MLFLOW_EXPERIMENT}"
 
+          echo "MLflow Tracking URI:"
+          echo "${MLFLOW_TRACKING_URI}"
+
           echo "S3 Bucket:"
           echo "${S3_BUCKET}"
 
@@ -137,99 +159,138 @@ jobs:
 
 
       # ==================================================
-      # 7. Preprocess
+      # 7. Test MLflow connection
+      # ==================================================
+
+      - name: Test MLflow connection
+        run: |
+
+          echo "======================================"
+          echo "TESTING MLFLOW CONNECTION"
+          echo "======================================"
+
+          curl --fail \
+            --max-time 20 \
+            "${MLFLOW_TRACKING_URI}/health"
+
+          echo ""
+
+          echo "MLflow server is reachable."
+
+
+      # ==================================================
+      # 8. Preprocess
       # ==================================================
 
       - name: Preprocess data
         run: |
 
-          echo "Running preprocessing..."
+          echo "======================================"
+          echo "PREPROCESSING DATA"
+          echo "======================================"
 
           python src/preprocess.py
 
+          echo ""
           echo "Checking artifacts..."
 
           ls -lh artifacts/
 
           test -f artifacts/train.csv
+
           test -f artifacts/test.csv
 
+          echo ""
           echo "Preprocessing completed successfully."
 
 
       # ==================================================
-      # 8. Train
+      # 9. Train
       # ==================================================
 
       - name: Train model
         run: |
 
-          echo "Training ${ALGORITHM} model..."
+          echo "======================================"
+          echo "TRAINING MODEL"
+          echo "======================================"
+
+          echo "Algorithm:"
+          echo "${ALGORITHM}"
 
           python src/train.py
 
+          echo ""
           echo "Checking model directory..."
 
           ls -lh model/
 
           test -f model/model.pkl
 
+          echo ""
           echo "Model training completed successfully."
 
 
       # ==================================================
-      # 9. Evaluate
+      # 10. Evaluate
       # ==================================================
 
       - name: Evaluate model
         run: |
 
-          echo "Evaluating model..."
+          echo "======================================"
+          echo "EVALUATING MODEL"
+          echo "======================================"
 
           python src/evaluate.py
 
+          echo ""
           echo "Evaluation completed successfully."
 
 
       # ==================================================
-      # 10. Inference test
+      # 11. Inference test
       # ==================================================
 
       - name: Run inference
         run: |
 
-          echo "Running inference test..."
+          echo "======================================"
+          echo "RUNNING INFERENCE TEST"
+          echo "======================================"
 
           python src/inference.py
 
+          echo ""
           echo "Inference completed successfully."
 
 
       # ==================================================
-      # 11. Unit tests
+      # 12. Unit tests
       # ==================================================
 
       - name: Run tests
         run: |
 
-          echo "Running pytest..."
+          echo "======================================"
+          echo "RUNNING PYTEST"
+          echo "======================================"
 
           pytest -v
 
+          echo ""
           echo "Tests completed successfully."
 
 
       # ==================================================
-      # 12. Verify application files
-      #
-      # IMPORTANT FOR DOCKER IMAGE
+      # 13. Verify application files
       # ==================================================
 
       - name: Verify application files
         run: |
 
           echo "======================================"
-          echo "Checking Docker application files"
+          echo "CHECKING DOCKER APPLICATION FILES"
           echo "======================================"
 
           echo "Repository files:"
@@ -239,58 +300,93 @@ jobs:
           echo "Model directory:"
           ls -lh model/
 
-          echo ""
-
           test -f app.py
+
           test -f Dockerfile
+
           test -f requirements.txt
+
           test -f model/model.pkl
 
+          echo ""
           echo "app.py found"
-          echo "Dockerfile found"
-          echo "requirements.txt found"
-          echo "model/model.pkl found"
 
-          echo "======================================"
+          echo "Dockerfile found"
+
+          echo "requirements.txt found"
+
+          echo "model/model.pkl found"
 
 
       # ==================================================
-      # 13. Upload processed datasets to S3
+      # 14. Upload processed datasets to S3
       # ==================================================
 
       - name: Upload processed datasets to S3
         run: |
 
-          echo "Uploading train.csv..."
+          echo "======================================"
+          echo "UPLOADING DATASETS TO S3"
+          echo "======================================"
 
           aws s3 cp \
             artifacts/train.csv \
             s3://${S3_BUCKET}/artifacts/train.csv
 
-
-          echo "Uploading test.csv..."
-
           aws s3 cp \
             artifacts/test.csv \
             s3://${S3_BUCKET}/artifacts/test.csv
 
+          echo ""
+          echo "Processed datasets uploaded."
+
 
       # ==================================================
-      # 14. Upload model to S3
+      # 15. Upload model to S3
       # ==================================================
 
       - name: Upload model to S3
         run: |
 
-          echo "Uploading model..."
+          echo "======================================"
+          echo "UPLOADING MODEL TO S3"
+          echo "======================================"
 
           aws s3 cp \
             model/model.pkl \
             s3://${S3_BUCKET}/models/${ALGORITHM}/model.pkl
 
+          echo ""
+          echo "Model uploaded successfully."
+
 
       # ==================================================
-      # 15. Verify S3
+      # 16. Upload evaluation results if available
+      # ==================================================
+
+      - name: Upload evaluation results
+        run: |
+
+          echo "======================================"
+          echo "UPLOADING EVALUATION RESULTS"
+          echo "======================================"
+
+          if [ -d "evaluation" ]; then
+
+            aws s3 cp \
+              evaluation/ \
+              s3://${S3_BUCKET}/evaluation/ \
+              --recursive
+
+          else
+
+            echo "No evaluation directory found."
+
+          fi
+
+
+      # ==================================================
+      # 17. Verify S3
       # ==================================================
 
       - name: Verify S3 artifacts
@@ -301,7 +397,8 @@ jobs:
           echo "======================================"
 
           aws s3 ls \
-            s3://${S3_BUCKET}/artifacts/
+            s3://${S3_BUCKET}/artifacts/ \
+            --recursive
 
           echo ""
 
@@ -313,9 +410,19 @@ jobs:
             s3://${S3_BUCKET}/models/ \
             --recursive
 
+          echo ""
+
+          echo "======================================"
+          echo "S3 EVALUATION"
+          echo "======================================"
+
+          aws s3 ls \
+            s3://${S3_BUCKET}/evaluation/ \
+            --recursive
+
 
       # ==================================================
-      # 16. Login to Amazon ECR
+      # 18. Login to Amazon ECR
       # ==================================================
 
       - name: Login to Amazon ECR
@@ -323,7 +430,7 @@ jobs:
 
 
       # ==================================================
-      # 17. Create unique Docker image tag
+      # 19. Create unique Docker image tag
       # ==================================================
 
       - name: Create Docker image tag
@@ -338,10 +445,14 @@ jobs:
           IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
 
           echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
+
           echo "ECR_REGISTRY=${ECR_REGISTRY}" >> $GITHUB_ENV
+
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+
           echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
 
+          echo ""
           echo "======================================"
           echo "DOCKER IMAGE"
           echo "======================================"
@@ -362,7 +473,7 @@ jobs:
 
 
       # ==================================================
-      # 18. Build Docker image
+      # 20. Build Docker image
       # ==================================================
 
       - name: Build Docker image
@@ -378,13 +489,14 @@ jobs:
             .
 
           echo ""
+
           echo "Docker image built successfully."
 
           docker images
 
 
       # ==================================================
-      # 19. Test Docker image locally
+      # 21. Test Docker image locally
       # ==================================================
 
       - name: Test Docker image
@@ -410,31 +522,38 @@ jobs:
           docker ps -a
 
           echo ""
+          echo "Container logs:"
+
+          docker logs lung-cancer-test || true
+
+          echo ""
           echo "Testing health endpoint..."
 
           curl --fail \
+            --retry 5 \
+            --retry-delay 2 \
             http://localhost:8000/health
 
           echo ""
+
           echo "Testing root endpoint..."
 
           curl --fail \
+            --retry 5 \
+            --retry-delay 2 \
             http://localhost:8000/
 
           echo ""
+
           echo "Docker application test successful."
 
-          echo ""
-          echo "Container logs:"
-
-          docker logs lung-cancer-test
-
           docker stop lung-cancer-test
+
           docker rm lung-cancer-test
 
 
       # ==================================================
-      # 20. Push Docker image to ECR
+      # 22. Push Docker image to ECR
       # ==================================================
 
       - name: Push Docker image to ECR
@@ -447,13 +566,14 @@ jobs:
           docker push "${IMAGE_URI}"
 
           echo ""
+
           echo "Docker image pushed successfully."
 
           echo "${IMAGE_URI}"
 
 
       # ==================================================
-      # 21. Verify ECR image
+      # 23. Verify ECR image
       # ==================================================
 
       - name: Verify ECR image
@@ -469,38 +589,47 @@ jobs:
             --region "${AWS_REGION}"
 
           echo ""
+
           echo "ECR image verified successfully."
 
 
       # ==================================================
-      # 22. Pipeline completed
+      # 24. Pipeline completed
       # ==================================================
 
       - name: Pipeline completed
         run: |
 
+          echo ""
           echo "======================================"
-          echo "CI PIPELINE SUCCESS"
+          echo "LUNG CANCER MLOps CI SUCCESS"
           echo "======================================"
 
+          echo ""
           echo "Algorithm:"
           echo "${ALGORITHM}"
 
           echo ""
-
           echo "MLflow Experiment:"
           echo "${MLFLOW_EXPERIMENT}"
 
           echo ""
+          echo "MLflow Tracking URI:"
+          echo "${MLFLOW_TRACKING_URI}"
 
+          echo ""
           echo "S3 Model:"
           echo "s3://${S3_BUCKET}/models/${ALGORITHM}/model.pkl"
 
           echo ""
-
           echo "Docker Image:"
           echo "${IMAGE_URI}"
 
-          
+          echo ""
+          echo "Git Commit:"
+          echo "${GITHUB_SHA}"
 
-          
+          echo ""
+          echo "======================================"
+          echo "PIPELINE COMPLETED SUCCESSFULLY"
+          echo "======================================"
